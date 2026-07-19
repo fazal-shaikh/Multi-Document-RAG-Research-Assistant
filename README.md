@@ -222,18 +222,19 @@ streamlit run app.py
 
 ---
 
-# 📸 Screenshots
+## 📸 Screenshots
 
-Add screenshots here.
 
-```
-screenshots/
-├── home.png
-├── upload.png
-├── chat.png
-├── comparison.png
-└── report.png
-```
+![Home](screenshots/home.png)
+
+
+![Upload](screenshots/insight.png)
+
+
+![Chat](screenshots/processing.png)
+
+
+![Comparison](screenshots/summary.png)
 
 ---
 
