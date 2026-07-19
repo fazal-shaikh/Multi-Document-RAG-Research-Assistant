@@ -228,13 +228,24 @@ streamlit run app.py
 ![Home](screenshots/home.png)
 
 
-![Upload](screenshots/insight.png)
+![Upload](screenshots/upload.png)
 
 
-![Chat](screenshots/processing.png)
+![summary](screenshots/summary.png)
 
 
-![Comparison](screenshots/summary.png)
+![answer](screenshots/answer.png)
+
+
+![citation](screenshots/citation.png)
+
+
+![textreport](screenshots/textreport.png)
+
+
+![pdfreport](screenshots/pdfreport.png)
+
+
 
 ---
 
