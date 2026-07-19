@@ -270,15 +270,6 @@ streamlit run app.py
 - 🎓 B.E. Computer Science & Engineering
 - 💼 Gen AI & Data Science Engineer
 
-**GitHub**
-
-https://github.com/fazal-shaikh
-
-**LinkedIn**
-
-https://linkedin.com/in/fazalmshaikh
-
----
 
 # ⭐ Support
 
