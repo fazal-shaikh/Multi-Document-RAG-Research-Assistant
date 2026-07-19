@@ -1,0 +1,21 @@
+# Virtual Environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment variables
+.env
+
+# Large files (RAG related)
+*.pkl
+*.faiss
+*.bin
+*.pt
+
+# Data folders
+data/
+models/
+vectorstore/
+embeddings/

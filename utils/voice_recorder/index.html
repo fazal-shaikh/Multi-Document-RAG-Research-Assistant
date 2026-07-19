@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .voice-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* Centered within its own iframe */
+            height: 50px;
+            width: 50px;
+            /* Smaller container as it's just the button now */
+            background: transparent;
+        }
+
+        .mic-button {
+            position: relative;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #94a3b8;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            outline: none;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .mic-button:hover {
+            background: rgba(139, 92, 246, 0.12);
+            border-color: rgba(139, 92, 246, 0.3);
+            color: #a855f7;
+            transform: scale(1.08);
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
+        }
+
+        .mic-button:active {
+            transform: scale(0.95);
+        }
+
+        /* Recording State - Glowing Pulse */
+        .mic-button.recording {
+            background: rgba(139, 92, 246, 0.2);
+            border-color: rgba(139, 92, 246, 0.5);
+            color: #a855f7;
+            animation: glow-pulse 2s infinite;
+        }
+
+        @keyframes glow-pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 12px rgba(139, 92, 246, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+            }
+        }
+
+        /* Transcribing State - Subtle Pulse Icon */
+        .mic-button.processing {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(139, 92, 246, 0.3);
+            color: #8b5cf6;
+            cursor: not-allowed;
+        }
+
+        .processing #mic-icon {
+            animation: icon-pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes icon-pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+
+            50% {
+                transform: scale(1.15);
+                opacity: 1;
+            }
+        }
+
+        /* Ring for recording */
+        .ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px solid rgba(139, 92, 246, 0.5);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .recording .ring {
+            animation: ring-pulse 2s infinite;
+        }
+
+        @keyframes ring-pulse {
+            0% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1.8);
+                opacity: 0;
+            }
+        }
+
+        /* Hide default spinner, we use icon pulse for processing */
+        .spinner {
+            display: none;
+        }
+
+        .mic-button svg {
+            width: 20px;
+            height: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="voice-input-container" class="voice-container">
+        <button id="mic-btn" class="mic-button" title="Start Voice Input">
+            <div class="ring"></div>
+            <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="22"></line>
+            </svg>
+        </button>
+    </div>
+
+    <script>
+        const micBtn = document.getElementById('mic-btn');
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        function sendMessage(type, data) {
+            window.parent.postMessage({
+                isStreamlitMessage: true,
+                type: type,
+                ...data
+            }, "*");
+        }
+
+        function setComponentValue(value) {
+            sendMessage("streamlit:setComponentValue", { value: value });
+        }
+
+        function setFrameHeight(height) {
+            sendMessage("streamlit:setFrameHeight", { height: height });
+        }
+
+        sendMessage("streamlit:componentReady", { apiVersion: 1 });
+        setFrameHeight(50);
+
+        // Position iframe dynamically
+        try {
+            const parentDoc = window.parent.document;
+            const myFrame = window.frameElement;
+            if (parentDoc && myFrame) {
+                const myContainer = myFrame.closest('div[data-testid="stHtml"]') || myFrame.closest('.element-container') || myFrame.parentElement;
+                if (myContainer) {
+                    // Move container to body to break out of transformed parent wrappers and ensure perfect fixed positioning.
+                    // Check parentNode to prevent infinite iframe reload loop.
+                    if (myContainer.parentNode !== parentDoc.body) {
+                        // Clean up any existing voice recorder containers in body to prevent duplicates
+                        const existing = parentDoc.getElementById("voice-recorder-container-fixed");
+                        if (existing) {
+                            existing.remove();
+                        }
+                        myContainer.id = "voice-recorder-container-fixed";
+                        parentDoc.body.appendChild(myContainer);
+                    }
+
+                    myContainer.style.position = 'fixed';
+                    myContainer.style.zIndex = '10001';
+                    myContainer.style.height = '50px';
+                    myContainer.style.width = '50px';
+                    myContainer.style.margin = '0';
+                    myContainer.style.padding = '0';
+                    myContainer.style.border = 'none';
+                    myContainer.style.background = 'transparent';
+
+                    myFrame.style.height = '50px';
+                    myFrame.style.width = '50px';
+                    myFrame.style.margin = '0';
+                    myFrame.style.padding = '0';
+                    myFrame.style.border = 'none';
+                    myFrame.style.background = 'transparent';
+
+                    const updatePos = () => {
+                        let chatInputContainer = null;
+                        const inputs = parentDoc.querySelectorAll('[data-testid="stChatInput"]');
+                        for (let input of inputs) {
+                            const r = input.getBoundingClientRect();
+                            if (r.width > 0 && r.height > 0) {
+                                chatInputContainer = input;
+                                break;
+                            }
+                        }
+
+                        if (chatInputContainer) {
+                            const rect = chatInputContainer.getBoundingClientRect();
+                            myContainer.style.left = (rect.left + 12) + 'px';
+                            myContainer.style.top = (rect.top + (rect.height - 50) / 2) + 'px';
+                        }
+                    };
+
+                    updatePos();
+                    // Repeated checks to handle rendering delays of the chat input container
+                    setTimeout(updatePos, 50);
+                    setTimeout(updatePos, 150);
+                    setTimeout(updatePos, 500);
+                    setTimeout(updatePos, 1000);
+                    setTimeout(updatePos, 2000);
+
+                    window.parent.addEventListener('resize', updatePos);
+
+                    const observer = new MutationObserver(updatePos);
+                    observer.observe(parentDoc.body, { attributes: true, subtree: true, childList: true });
+                }
+            }
+        } catch (e) {
+            console.error("Voice positioning error:", e);
+        }
+
+        function updateParentUI(state) {
+            try {
+                const chatInput = window.parent.document.querySelector('textarea[data-testid="stChatInputTextArea"]');
+                if (chatInput) {
+                    if (state === 'recording') {
+                        chatInput.placeholder = "Listening...";
+                    } else if (state === 'processing') {
+                        chatInput.placeholder = "Transcribing...";
+                    } else {
+                        chatInput.placeholder = "Enter your research question...";
+                    }
+                }
+            } catch (e) { }
+        }
+
+        micBtn.onclick = async () => {
+            if (micBtn.classList.contains('processing')) return;
+            if (isRecording) {
+                stopRecording();
+                return;
+            }
+            startRecording();
+        };
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.onstart = () => {
+                    isRecording = true;
+                    micBtn.classList.add('recording');
+                    updateParentUI('recording');
+                };
+
+                mediaRecorder.onstop = async () => {
+                    isRecording = false;
+                    micBtn.classList.remove('recording');
+                    micBtn.classList.add('processing');
+                    updateParentUI('processing');
+
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(audioBlob);
+                    reader.onloadend = () => {
+                        setComponentValue(reader.result.split(',')[1]);
+                    };
+                    stream.getTracks().forEach(t => t.stop());
+                };
+
+                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                mediaRecorder.start();
+            } catch (err) {
+                console.error(err);
+                alert("Microphone access failed.");
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+            }
+        }
+    </script>
+</body>
+
+</html>
